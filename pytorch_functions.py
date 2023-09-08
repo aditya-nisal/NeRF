@@ -8,7 +8,7 @@ print("torch.split: {}".format(torch.split(x, 2))) #SPLITS TENSOR INTO NMBR OG G
 
 print("torch.cumprod: {}".format(torch.cumprod(x, dim = -1))) #PRODUCT OF THE ELEMENTS OF TENSOR ALONG A GIVEN AXIS
 
-print("torch.roll: {}".format(torch.roll(x, 1, dims = -1))) #ROLLS THE COLUMNS OR ROWS AS PER THE AXIS
+print("torch.roll: {}".format(torch.roll(x, 3, dims = -1))) #ROLLS THE COLUMNS OR ROWS AS PER THE AXIS
 
 print(x.shape)
 print("torch.cat: {}".format(torch.cat((torch.ones((x.shape[0], x.shape[1])), x), dim=-1))) #CONCATENETES THE TENSOR ALONG THE SPECIFIED AXIS
