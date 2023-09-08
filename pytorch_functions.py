@@ -6,7 +6,7 @@ print("torch.tensor: {}".format(x)) #CREATES TENSOR
 
 print("torch.split: {}".format(torch.split(x, 2))) #SPLITS TENSOR INTO NMBR OG GROUPS
 
-print("torch.cumprod: {}".format(torch.cumprod(x, dim = 1))) #PRODUCT OF THE ELEMENTS OF TENSOR ALONG A GIVEN AXIS
+print("torch.cumprod: {}".format(torch.cumprod(x, dim = -1))) #PRODUCT OF THE ELEMENTS OF TENSOR ALONG A GIVEN AXIS
 
 print("torch.roll: {}".format(torch.roll(x, 1, dims = -1))) #ROLLS THE COLUMNS OR ROWS AS PER THE AXIS
 
