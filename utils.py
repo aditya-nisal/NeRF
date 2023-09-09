@@ -68,27 +68,27 @@ def QueryPointsFromRays(ray_origins, ray_directions, near_plane, far_plane, num_
     :param randomize: Whether to randomize the depth samples.
     :return: Tuple containing the query points and depth values.
     """
-    device = ray_origins.device # Get the device of the ray origins
-    batch_size = ray_origins.shape[0] # Get the batch size
-    num_rays = ray_origins.shape[1] # Get the number of rays
+    device = ray_origins.device # GET DEVICE OF RAY ORIGIN
+    batch_size = ray_origins.shape[0] # GET BATCH SIZE
+    num_rays = ray_origins.shape[1] # GET NO. OF RAYS
 
-    # Generate a list of depth values for each ray
+    # GENERATE LIST OF DEPTH VALUE FOR EACH RAY AND LOOP IT
     depth_values_list = []
     for _ in range(batch_size):
         for _ in range(num_rays):
-            depth_values = torch.linspace(near_plane, far_plane, num_samples, device=device) # Generate a list of depth values
+            depth_values = torch.linspace(near_plane, far_plane, num_samples, device=device) # CREATE LIST OF DEPTH VALUES
             if randomize: 
-                noise = torch.rand((num_samples,), device=device) # Generate a list of random numbers
-                depth_values += noise * (far_plane - near_plane) / num_samples # Add the random numbers to the depth values
-            depth_values_list.append(depth_values) # Append the depth values to the list
+                noise = torch.rand((num_samples,), device=device) # GENERATING A LIST OF RANDOMNESS
+                depth_values += noise * (far_plane - near_plane) / num_samples # ADDING RANDOMNESS TO DEPTH VALUE
+            depth_values_list.append(depth_values) 
 
-    # Stack the list of depth values into a tensor
+    # STACK DEPTH_VALUES AS TENSOR AND RESHAPE TO *BAATCH_SIZE, NUM_RAYS, NUM_SAMPLES)
     depth_values = torch.stack(depth_values_list, dim=0).reshape(batch_size, num_rays, num_samples)
     
-    # Compute query points from ray origins, ray directions, and depth values
+    # BASICALLY TRANSLATION + ROTATION INTO DIRECTION. GETS EVERY POINT THROUGH THE NUM_SAMPLES WE PASSED
     query_points = ray_origins[..., None, :] + ray_directions[..., None, :] * depth_values[..., :, None]
 
-    return query_points, depth_values
+    return query_points, depth_values # GET QUERY POINTS AND THE DEPTH VALUES
 
 
 def RenderVolumeDensity(radiance_field, ray_origins, depth_values):
