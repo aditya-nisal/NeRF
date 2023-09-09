@@ -111,3 +111,43 @@ def RenderVolumeDensity(radiance_field, ray_origins, depth_values):
     depth_map = (ray_weights * depth_values).sum(dim=-1) # GET THE DEPTH MAP
     weight_sum = ray_weights.sum(-1) # COMPUTE ACCUMULATED DENSITY MAP
     return color_map, depth_map, weight_sum # RETURN COLOUR MAP, DEPTH MAP AND ACCUMULATED DENSITY MAP
+
+
+def ComputePositionalEncoding(input_tensor, num_encoding_functions=6, include_input=True, use_log_sampling=True):
+    """
+    Takes:
+    Input tensor.
+    Number of encoding functions to use.
+    Whether to include the input tensor in the encoding.
+    Whether to use logarithmic sampling of the encoding functions.
+    Returns: 
+    Positional encoding tensor.
+    """
+
+    encoding = [input_tensor] if include_input else [] # INITIALIZE THE ENCODING LIST
+
+    device = input_tensor.device
+    
+    # COMPUTE THE FREQUENCY BAND
+    if use_log_sampling:      # FREQUENCIES ARE GENERATED IN LOGARITHMIC SCALE (FREQ^2)
+        freq_bands = 2.0 ** torch.linspace( 
+            0.0,
+            num_encoding_functions - 1,
+            num_encoding_functions,
+            dtype=input_tensor.dtype,
+            device=device,
+        )
+    else:                     # FREQUENCIES ARE LINEARLY SPACED BETWEEN GIVEN RANGE
+        freq_bands = torch.linspace(
+            2.0 ** 0.0,
+            2.0 ** (num_encoding_functions - 1),
+            num_encoding_functions,
+            dtype=input_tensor.dtype,
+            device=device,
+        )
+
+    for freq in freq_bands:
+        encoding.append(torch.sin(input_tensor * freq))
+        encoding.append(torch.cos(input_tensor * freq))
+
+    return torch.cat(encoding, dim=-1) # RETURN THE CONCATENATED INDIVIDUAL ENCODED TENSORS
