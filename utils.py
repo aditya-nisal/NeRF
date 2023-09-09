@@ -17,3 +17,10 @@ def CumulativeProdut(tensor):
     return exclusive_cum_prod
 
 
+def MiniBatches(inputs, chunksize = 1024*8):
+    '''
+    Takes: tensor to split, size of each tensor after splitting
+    Returns: Minibatches after splitting
+    '''
+    return torch.split(inputs, chunksize) #SPLITTING THE TENSOR INTO BATCHES WITH EACH BATCH OF SIZE CHUNKSIZE
+
