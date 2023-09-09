@@ -59,14 +59,14 @@ def GetRayBundle(height, width, focal_length, T_cam2world):
 
 def QueryPointsFromRays(ray_origins, ray_directions, near_plane, far_plane, num_samples, randomize=True):
     """
-    Function to compute query points along rays.
-    :param ray_origins: Origin of each ray in the "bundle" as returned by the `get_ray_bundle()` method.
-    :param ray_directions: Direction of each ray in the "bundle" as returned by the `get_ray_bundle()` method.
-    :param near_plane: Near plane for the depth values.
-    :param far_plane: Far plane for the depth values.
-    :param num_samples: Number of depth samples along each ray.
-    :param randomize: Whether to randomize the depth samples.
-    :return: Tuple containing the query points and depth values.
+    Takes:
+    param ray_origins: Origin of each ray in the "bundle" as returned by the `get_ray_bundle()` method.
+    param ray_directions: Direction of each ray in the "bundle" as returned by the `get_ray_bundle()` method.
+    param near_plane: Near plane for the depth values.
+    param far_plane: Far plane for the depth values.
+    param num_samples: Number of depth samples along each ray.
+    param randomize: Whether to randomize the depth samples.
+    Returns: Tuple containing the query points and depth values.
     """
     device = ray_origins.device # GET DEVICE OF RAY ORIGIN
     batch_size = ray_origins.shape[0] # GET BATCH SIZE
