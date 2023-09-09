@@ -55,3 +55,38 @@ def GetRayBundle(height, width, focal_length, T_cam2world):
     world_directions = torch.sum(pixel_directions[..., None, :] * T_cam2world[:3, :3], dim = -1)
     ray_origins = T_cam2world[:3, -1].expand(world_directions.shape)
     return ray_origins, world_directions
+
+
+def QueryPointsFromRays(ray_origins, ray_directions, near_plane, far_plane, num_samples, randomize=True):
+    """
+    Takes:
+    Ray_origins: Origin of each ray in the "bundle" as returned by the `GetRayBundle()` method.
+    Ray_directions: Direction of each ray in the "bundle" as returned by the `GetRayBundle()` method.
+    Near_plane: Near plane for the depth values.
+    Far_plane: Far plane for the depth values.
+    Num_samples: Number of depth samples along each ray.
+    Randomize: Whether to randomize the depth samples.
+    Returns: 
+    Tuple containing the query points and depth values.
+    """
+    device = ray_origins.device # GET DEVICE OF RAY ORIGIN
+    batch_size = ray_origins.shape[0] # GET BATCH SIZE
+    num_rays = ray_origins.shape[1] # GET NO. OF RAYS
+
+    # GENERATE LIST OF DEPTH VALUE FOR EACH RAY AND LOOP IT
+    depth_values_list = []
+    for _ in range(batch_size):
+        for _ in range(num_rays):
+            depth_values = torch.linspace(near_plane, far_plane, num_samples, device=device) # CREATE LIST OF DEPTH VALUES
+            if randomize: 
+                noise = torch.rand((num_samples,), device=device) # GENERATING A LIST OF RANDOMNESS
+                depth_values += noise * (far_plane - near_plane) / num_samples # ADDING RANDOMNESS TO DEPTH VALUE
+            depth_values_list.append(depth_values) 
+
+    # STACK DEPTH_VALUES AS TENSOR AND RESHAPE TO *BAATCH_SIZE, NUM_RAYS, NUM_SAMPLES)
+    depth_values = torch.stack(depth_values_list, dim=0).reshape(batch_size, num_rays, num_samples)
+    
+    # BASICALLY TRANSLATION + ROTATION INTO DIRECTION. GETS EVERY POINT THROUGH THE NUM_SAMPLES WE PASSED
+    query_points = ray_origins[..., None, :] + ray_directions[..., None, :] * depth_values[..., :, None]
+
+    return query_points, depth_values # GET QUERY POINTS AND THE DEPTH VALUES
