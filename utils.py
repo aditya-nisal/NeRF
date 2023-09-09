@@ -90,3 +90,24 @@ def QueryPointsFromRays(ray_origins, ray_directions, near_plane, far_plane, num_
     query_points = ray_origins[..., None, :] + ray_directions[..., None, :] * depth_values[..., :, None]
 
     return query_points, depth_values # GET QUERY POINTS AND THE DEPTH VALUES
+
+
+def RenderVolumeDensity(radiance_field, ray_origins, depth_values):
+    """
+    Takes:
+    Radiance field of the volume.
+    Origin of each ray in the "bundle" as returned by the `GetRayBundle()` method.
+    Depth values along each ray as returned by the `QueryPointsFromRays()` method.
+    Returns:
+    Tuple containing the density map, depth map, and accumulated density map.
+    """
+    attenuation = torch.nn.functional.relu(radiance_field[..., 3]) # GET THE ATTENUATION VALUES
+    color = torch.sigmoid(radiance_field[..., :3]) # GET THE COLOUR VALUES
+    max_depth = torch.tensor([1e10], dtype=ray_origins.dtype, device=ray_origins.device) # GET MAXIMUM DEPTH VALUES
+    ray_lengths = torch.cat((depth_values[..., 1:] - depth_values[..., :-1], max_depth.expand(depth_values[..., :1].shape)), dim=-1) # COMPUTE LENGTH OF EACH RAY SEGMENT
+    ray_alphas = 1. - torch.exp(-attenuation * ray_lengths) # COMPUTE ALPHA VALUES FOR EACH RAY SEGMENT
+    ray_weights = ray_alphas * CumulativeProdut(1. - ray_alphas + 1e-10) # COMPUTE WEIGHTS FOR EACH RAY SEGMENT
+    color_map = (ray_weights[..., None] * color).sum(dim=-2) # GET TEH COLOUR MAP
+    depth_map = (ray_weights * depth_values).sum(dim=-1) # GET THE DEPTH MAP
+    weight_sum = ray_weights.sum(-1) # COMPUTE ACCUMULATED DENSITY MAP
+    return color_map, depth_map, weight_sum # RETURN COLOUR MAP, DEPTH MAP AND ACCUMULATED DENSITY MAP
