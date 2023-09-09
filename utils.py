@@ -24,3 +24,6 @@ def MiniBatches(inputs, chunksize = 1024*8):
     '''
     return torch.split(inputs, chunksize) #SPLITTING THE TENSOR INTO BATCHES WITH EACH BATCH OF SIZE CHUNKSIZE
 
+
+def NormalizeImage(image):
+    return cv2.normalize(image,dst=None, alpha=-1, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
