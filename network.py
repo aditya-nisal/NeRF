@@ -63,7 +63,7 @@ class Actual_NeRF(nn.Module):
 ########################################## TINY NERF ##########################################
 
 class tinyNeRF(nn.Module): # SIMPLIFIED AND SMALL MODEL
-    def __init__(self, size, W): # INPUR ARGS: SIZE OF INPUT TENSOR, WIDTH OF HIDDEN LAYER
+    def __init__(self, size, W): # INPUT ARGS: SIZE OF INPUT TENSOR, WIDTH OF HIDDEN LAYER
         super(tinyNeRF, self).__init__() # CALLS THE INITIALIZATION METHOD OF THE nn.Module
 
         self.Layers1 = nn.Sequential(
@@ -101,3 +101,41 @@ class tinyNeRF(nn.Module): # SIMPLIFIED AND SMALL MODEL
         colors = torch.sigmoid(output2[:, :-1])
         return colors, sigma
     
+
+########################################## TRAINABLE NERF MODEL ##########################################
+
+class Nerf(nn.Module):
+    def __init__(self, filter_size=128, num_encoding_functions=6): # INPUT ARGS: NUM. OF NEURONS IN HIDDEN LAYER, NUM. OF FREQUENCY BANDS USED
+        super(Nerf, self).__init__() # CALLS THE INITIALIZATION METHOD OF THE nn.Module
+        
+        self.input_layer = nn.Linear(3 + 3 * 2 * num_encoding_functions, filter_size)
+        nn.init.xavier_uniform_(self.input_layer.weight) # INITALIZED WITH XAVIERS UNIFORM FOR WEIGHTS
+        nn.init.zeros_(self.input_layer.bias) # INITALIZED WITH XAVIERS UNIFORM FOR BIAS
+        
+        self.hidden_layers = nn.ModuleList() # LIST OBJECT TO HOLD MODULES IN PYTORCH
+        for i in range(3): # LIST OF 3 HIDDEN LAYERS
+            layer = nn.Linear(filter_size, filter_size)
+            nn.init.xavier_uniform_(layer.weight) # INITALIZED WITH XAVIERS UNIFORM FOR WEIGHTS
+            nn.init.zeros_(layer.bias) # INITALIZED WITH XAVIERS UNIFORM FOR BIAS
+            self.hidden_layers.append(layer)
+        
+        self.output_layer = nn.Linear(filter_size, 4)
+        nn.init.xavier_uniform_(self.output_layer.weight) # INITALIZED WITH XAVIERS UNIFORM FOR WEIGHTS
+        nn.init.zeros_(self.output_layer.bias) # INITALIZED WITH XAVIERS UNIFORM FOR BIAS
+        
+        self.activation = F.elu
+
+    def forward(self, x):
+        '''
+        Takes: 
+        Input tensor
+        Retunrs:
+        Tensor (colour (size3) + Volume densiy (size 1))
+        '''
+        x = self.activation(self.input_layer(x))
+        
+        for layer in self.hidden_layers:
+            x = self.activation(layer(x))
+            
+        x = self.output_layer(x)
+        return x
