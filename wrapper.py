@@ -5,9 +5,9 @@ import numpy as np
 import torch
 import wget
 import matplotlib.pyplot as plt
-from Utils import *
+from utils import *
 from typing import Optional
-from Network import *
+from network import *
 
 
 # ALTERNATIVE IF THE DATASET IS NOT FOUND
