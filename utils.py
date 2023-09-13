@@ -83,7 +83,7 @@ def QueryPointsFromRays(ray_origins, ray_directions, near_plane, far_plane, num_
                 depth_values += noise * (far_plane - near_plane) / num_samples # ADDING RANDOMNESS TO DEPTH VALUE
             depth_values_list.append(depth_values) 
 
-    # STACK DEPTH_VALUES AS TENSOR AND RESHAPE TO *BAATCH_SIZE, NUM_RAYS, NUM_SAMPLES)
+    # STACK DEPTH_VALUES AS TENSOR AND RESHAPE TO BAATCH_SIZE, NUM_RAYS, NUM_SAMPLES)
     depth_values = torch.stack(depth_values_list, dim=0).reshape(batch_size, num_rays, num_samples)
     
     # BASICALLY TRANSLATION + ROTATION INTO DIRECTION. GETS EVERY POINT THROUGH THE NUM_SAMPLES WE PASSED
