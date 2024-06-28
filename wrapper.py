@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from utils import *
 from typing import Optional
 from network import *
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 
 # ALTERNATIVE IF THE DATASET IS NOT FOUND
@@ -32,7 +33,7 @@ def LoadData():
 
 def RunIter(height, width, focal_length, tform_cam2world,
              near_clip, far_clip, num_samples_per_ray,
-             encoding_fn, batch_fn, model):
+             encoding_fn, batch_fn, model, scene_complexity=None):
     
     # COMPUTE BUNDLE RAYS THROUGH ALL THE PIXELS 
     ray_origins, ray_directions = GetRayBundle(height, width, focal_length,
@@ -41,7 +42,7 @@ def RunIter(height, width, focal_length, tform_cam2world,
     # GET THE SAMPLED QUERY POINTS AND DEPTH VALUES
     query_points, depth_values = QueryPointsFromRays(ray_origins, ray_directions,
                                                                 near_clip, far_clip,
-                                                                num_samples_per_ray)
+                                                                num_samples_per_ray, scene_complexity=scene_complexity)
 
     # FLATTEN 3D QUERY POINTS
     flattened_query_points = query_points.reshape((-1, 3))
@@ -63,6 +64,11 @@ def RunIter(height, width, focal_length, tform_cam2world,
     rgb_predicted, _, _ = RenderVolumeDensity(radiance_field, ray_origins, depth_values)
 
     return rgb_predicted
+
+def calculate_psnr(target, prediction):
+    mse = torch.nn.functional.mse_loss(target, prediction)
+    psnr = 10 * torch.log10(1 / mse)
+    return psnr
 
 def main():
 
@@ -134,16 +140,18 @@ def main():
     lr = 5e-3  # LEARNING RATE
     num_iters = 1000  # NUM. ITERATIONS
 
-    # MISCELLENEIOUS PARAMETERS
+    # MISCELLANEOUS PARAMETERS
     display_every = 100  # AFTER HOW MANY ITERATIONS TRAINING STATS TO BE DISPLAYED
 
     model = Nerf(num_encoding_functions=num_encoding_functions)  # INITIALIZE THE MODEL
     model.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)  # INITIALIZE ADAM OPTIMIZER WITH LEARNING RATE
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=10, verbose=True)  # ADD A LEARNING RATE SCHEDULER
 
     # STORE ERROR AND LOSS VALUES IN LIST
     list_of_error = []  
+    list_of_psnr = []
     iterations = []
 
     from tqdm import tqdm_notebook as tqdm
@@ -155,16 +163,22 @@ def main():
         target_img_idx = np.random.randint(images.shape[0])  # SELECT A RANDOM IMAGE INDEX
         target_img = images[target_img_idx].to(device)  # SELECT A RANDOM IMAGE
         target_tform_cam2world = tform_cam2world[target_img_idx].to(device)  # GET THE CORRESPONDING IMAGE POSE
+        scene_complexity = torch.std(target_img).item() / 255.0
 
         rgb_predicted = RunIter(height, width, focal_length,
                                  target_tform_cam2world, near_thresh,
                                  far_thresh, depth_samples_per_ray,
-                                 encode, MiniBatches, model)  # FORWARD PASS OF THE MODEL YIELDING A RGB IMAGE
+                                 encode, MiniBatches, model, scene_complexity=scene_complexity)  # FORWARD PASS OF THE MODEL YIELDING A RGB IMAGE
 
         loss = torch.nn.functional.mse_loss(rgb_predicted, target_img)  # LOSS BETWEEN RGB VALUES AND ACTUAL IMAGE USING MSE
         loss.backward()  # BACKPROPOGATION
         optimizer.step()  # UPDATE MODEL PARAMS
         optimizer.zero_grad()  # RESET GRADIENTS
+
+        psnr = calculate_psnr(target_img, rgb_predicted)  # CALCULATE PSNR
+        list_of_psnr.append(psnr.item())
+
+        scheduler.step(loss)  # STEP THE SCHEDULER
 
         if i % display_every == 0:
             rgb_predicted = RunIter(height, width, focal_length,
@@ -183,8 +197,10 @@ def main():
             plt.imshow(rgb_predicted.detach().cpu().numpy())
             plt.title(f"{i}th iteration")
             plt.subplot(122)
-            plt.plot(iterations, list_of_error)
-            plt.title("Loss Plot")
+            plt.plot(iterations, list_of_error, label='Log Loss')
+            plt.plot(iterations, list_of_psnr, label='PSNR')
+            plt.title("Loss and PSNR Plot")
+            plt.legend()
             plt.show()
 
         print('Done!')
@@ -199,7 +215,7 @@ def main():
         rgb = RunIter(height, width, focal_length, c2w[:3, :4], 2, 6, depth_samples_per_ray, encode, MiniBatches,
                        model)
 
-        # CONVER IMAGES TO NUMPY ARRAY 
+        # CONVERT IMAGES TO NUMPY ARRAY 
         image = (255 * np.clip(rgb.clone().detach().cpu().numpy(), 0, 1)).astype(np.uint8)
         images1.append(image) # LIST OF RENDERING IMAGES USE TO CREATE A VIDEO
         plt.imshow(image)

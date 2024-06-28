@@ -57,39 +57,67 @@ def GetRayBundle(height, width, focal_length, T_cam2world):
     return ray_origins, world_directions
 
 
-def QueryPointsFromRays(ray_origins, ray_directions, near_plane, far_plane, num_samples, randomize=True):
+# def QueryPointsFromRays(ray_origins, ray_directions, near_plane, far_plane, num_samples, randomize=True):
+#     """
+#     Takes:
+#     Ray_origins: Origin of each ray in the "bundle" as returned by the `GetRayBundle()` method.
+#     Ray_directions: Direction of each ray in the "bundle" as returned by the `GetRayBundle()` method.
+#     Near_plane: Near plane for the depth values.
+#     Far_plane: Far plane for the depth values.
+#     Num_samples: Number of depth samples along each ray.
+#     Randomize: Whether to randomize the depth samples.
+#     Returns: 
+#     Tuple containing the query points and depth values.
+#     """
+#     device = ray_origins.device # GET DEVICE OF RAY ORIGIN
+#     batch_size = ray_origins.shape[0] # GET BATCH SIZE
+#     num_rays = ray_origins.shape[1] # GET NO. OF RAYS
+
+#     # GENERATE LIST OF DEPTH VALUE FOR EACH RAY AND LOOP IT
+#     depth_values_list = []
+#     for _ in range(batch_size):
+#         for _ in range(num_rays):
+#             depth_values = torch.linspace(near_plane, far_plane, num_samples, device=device) # CREATE LIST OF DEPTH VALUES
+#             if randomize: 
+#                 noise = torch.rand((num_samples,), device=device) # GENERATING A LIST OF RANDOMNESS
+#                 depth_values += noise * (far_plane - near_plane) / num_samples # ADDING RANDOMNESS TO DEPTH VALUE
+#             depth_values_list.append(depth_values) 
+
+#     # STACK DEPTH_VALUES AS TENSOR AND RESHAPE TO BAATCH_SIZE, NUM_RAYS, NUM_SAMPLES)
+#     depth_values = torch.stack(depth_values_list, dim=0).reshape(batch_size, num_rays, num_samples)
+    
+#     # BASICALLY TRANSLATION + ROTATION INTO DIRECTION. GETS EVERY POINT THROUGH THE NUM_SAMPLES WE PASSED
+#     query_points = ray_origins[..., None, :] + ray_directions[..., None, :] * depth_values[..., :, None]
+
+#     return query_points, depth_values # GET QUERY POINTS AND THE DEPTH VALUES
+
+
+def QueryPointsFromRays(ray_origins, ray_directions, near_plane, far_plane, base_samples, scene_complexity=None, randomize=True):
     """
-    Takes:
-    Ray_origins: Origin of each ray in the "bundle" as returned by the `GetRayBundle()` method.
-    Ray_directions: Direction of each ray in the "bundle" as returned by the `GetRayBundle()` method.
-    Near_plane: Near plane for the depth values.
-    Far_plane: Far plane for the depth values.
-    Num_samples: Number of depth samples along each ray.
-    Randomize: Whether to randomize the depth samples.
-    Returns: 
-    Tuple containing the query points and depth values.
+    Adaptive sampling of query points along rays.
     """
     device = ray_origins.device # GET DEVICE OF RAY ORIGIN
     batch_size = ray_origins.shape[0] # GET BATCH SIZE
     num_rays = ray_origins.shape[1] # GET NO. OF RAYS
 
-    # GENERATE LIST OF DEPTH VALUE FOR EACH RAY AND LOOP IT
+    num_samples = base_samples
+    if scene_complexity is not None:
+        num_samples = int(base_samples * scene_complexity) # Adjust the number of samples based on scene complexity
+
     depth_values_list = []
     for _ in range(batch_size):
         for _ in range(num_rays):
             depth_values = torch.linspace(near_plane, far_plane, num_samples, device=device) # CREATE LIST OF DEPTH VALUES
-            if randomize: 
+            if randomize:
                 noise = torch.rand((num_samples,), device=device) # GENERATING A LIST OF RANDOMNESS
                 depth_values += noise * (far_plane - near_plane) / num_samples # ADDING RANDOMNESS TO DEPTH VALUE
             depth_values_list.append(depth_values) 
 
-    # STACK DEPTH_VALUES AS TENSOR AND RESHAPE TO BAATCH_SIZE, NUM_RAYS, NUM_SAMPLES)
     depth_values = torch.stack(depth_values_list, dim=0).reshape(batch_size, num_rays, num_samples)
-    
-    # BASICALLY TRANSLATION + ROTATION INTO DIRECTION. GETS EVERY POINT THROUGH THE NUM_SAMPLES WE PASSED
     query_points = ray_origins[..., None, :] + ray_directions[..., None, :] * depth_values[..., :, None]
 
     return query_points, depth_values # GET QUERY POINTS AND THE DEPTH VALUES
+
 
 
 def RenderVolumeDensity(radiance_field, ray_origins, depth_values):
@@ -113,38 +141,58 @@ def RenderVolumeDensity(radiance_field, ray_origins, depth_values):
     return color_map, depth_map, weight_sum # RETURN COLOUR MAP, DEPTH MAP AND ACCUMULATED DENSITY MAP
 
 
-def ComputePositionalEncoding(input_tensor, num_encoding_functions=6, include_input=True, use_log_sampling=True):
-    """
-    Takes:
-    Input tensor.
-    Number of encoding functions to use.
-    Whether to include the input tensor in the encoding.
-    Whether to use logarithmic sampling of the encoding functions.
-    Returns: 
-    Positional encoding tensor.
-    """
+# def ComputePositionalEncoding(input_tensor, num_encoding_functions=6, include_input=True, use_log_sampling=True):
+#     """
+#     Takes:
+#     Input tensor.
+#     Number of encoding functions to use.
+#     Whether to include the input tensor in the encoding.
+#     Whether to use logarithmic sampling of the encoding functions.
+#     Returns: 
+#     Positional encoding tensor.
+#     """
 
+#     encoding = [input_tensor] if include_input else [] # INITIALIZE THE ENCODING LIST
+
+#     device = input_tensor.device
+    
+#     # COMPUTE THE FREQUENCY BAND
+#     if use_log_sampling:      # FREQUENCIES ARE GENERATED IN LOGARITHMIC SCALE (FREQ^2)
+#         freq_bands = 2.0 ** torch.linspace( 
+#             0.0,
+#             num_encoding_functions - 1,
+#             num_encoding_functions,
+#             dtype=input_tensor.dtype,
+#             device=device,
+#         )
+#     else:                     # FREQUENCIES ARE LINEARLY SPACED BETWEEN GIVEN RANGE
+#         freq_bands = torch.linspace(
+#             2.0 ** 0.0,
+#             2.0 ** (num_encoding_functions - 1),
+#             num_encoding_functions,
+#             dtype=input_tensor.dtype,
+#             device=device,
+#         )
+
+#     for freq in freq_bands:
+#         encoding.append(torch.sin(input_tensor * freq))
+#         encoding.append(torch.cos(input_tensor * freq))
+
+#     return torch.cat(encoding, dim=-1) # RETURN THE CONCATENATED INDIVIDUAL ENCODED TENSORS
+
+def ComputePositionalEncoding(input_tensor, num_encoding_functions=6, include_input=True, scene_complexity=None):
+    """
+    Enhanced positional encoding with dynamic frequency selection based on scene complexity.
+    """
     encoding = [input_tensor] if include_input else [] # INITIALIZE THE ENCODING LIST
 
     device = input_tensor.device
     
-    # COMPUTE THE FREQUENCY BAND
-    if use_log_sampling:      # FREQUENCIES ARE GENERATED IN LOGARITHMIC SCALE (FREQ^2)
-        freq_bands = 2.0 ** torch.linspace( 
-            0.0,
-            num_encoding_functions - 1,
-            num_encoding_functions,
-            dtype=input_tensor.dtype,
-            device=device,
-        )
-    else:                     # FREQUENCIES ARE LINEARLY SPACED BETWEEN GIVEN RANGE
-        freq_bands = torch.linspace(
-            2.0 ** 0.0,
-            2.0 ** (num_encoding_functions - 1),
-            num_encoding_functions,
-            dtype=input_tensor.dtype,
-            device=device,
-        )
+    if scene_complexity is not None:
+        # Adjust the frequency bands dynamically based on scene complexity
+        freq_bands = torch.logspace(0.0, scene_complexity, num_encoding_functions, base=2.0, dtype=input_tensor.dtype, device=device)
+    else:
+        freq_bands = 2.0 ** torch.linspace(0.0, num_encoding_functions - 1, num_encoding_functions, dtype=input_tensor.dtype, device=device)
 
     for freq in freq_bands:
         encoding.append(torch.sin(input_tensor * freq))
